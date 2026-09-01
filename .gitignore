@@ -1,0 +1,23 @@
+# Ambiente / segredos
+.env
+.env.*
+!.env.example
+
+# Dados de volumes / dumps locais
+postgres_data/
+*.sql
+*.dump
+*.bak
+
+# Logs
+*.log
+logs/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Editores
+.idea/
+.vscode/
+*.swp

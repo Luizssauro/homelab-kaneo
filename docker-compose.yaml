@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Exposto apenas no loopback do host (psql/backup). O container kaneo
+    # acessa via rede interna do Compose, sem depender desta porta.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - internal
+
+  kaneo:
+    image: ghcr.io/usekaneo/kaneo:2.17.6@sha256:33a1b3297551981a1652a51dc8bb9dab1ffd3fe7c0899105c12e245a587bac15
+    ports:
+      - "5173:5173"
+    environment:
+      # Conecta pelo nome do serviço na rede do Compose, não pelo host.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      KANEO_CLIENT_URL: ${KANEO_CLIENT_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      AUTH_SECRET: ${AUTH_SECRET}
+      DISABLE_GUEST_ACCESS: ${DISABLE_GUEST_ACCESS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5173/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+
+networks:
+  internal:
